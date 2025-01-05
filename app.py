@@ -1,45 +1,61 @@
 import streamlit as st
+import pandas as pd
+import joblib
+from sklearn.tree import DecisionTreeClassifier
 
-from fastai.vision.all import *
-import pathlib
+# Sarlavha
+st.title("Qandli diabetni aniqlash tizimi")
 
-# Fayl yo'llarini tuzatish (Windows platformasi uchun)
-temp = pathlib.PosixPath
-pathlib.PosixPath = pathlib.WindowsPath
+# Modelni yuklash
+try:
+    model_path = 'decision_tree_model.pkl'
+    model = joblib.load(model_path)
+except FileNotFoundError:
+    st.error("Model fayli topilmadi. Iltimos, 'decision_tree_model.pkl' faylini tekshiring va qaytadan urinib ko'ring.")
+    st.stop()
 
-st.title("Rasimlarni klassifikatsiya qilish")
+# Foydalanuvchi ma'lumotlarini kiritish formasi
+st.header("Foydalanuvchi ma'lumotlarini kiriting")
 
-# Rasim yuklash interfeysi
-files = st.file_uploader("Rasm yuklash", type=["jpg", "svg", "png"])
+pregnancies = st.number_input("Homiladorliklar soni")
+glucose = st.number_input("Qondagi glyukoza miqdori (mg/dL)")
+blood_pressure = st.number_input("Qon bosimi (mmHg)")
+skin_thickness = st.number_input("Teri qalinligi (mm)")
+insulin = st.number_input("Insulin darajasi (IU/mL)")
+bmi = st.number_input("Tana massasi indeksi (BMI)")
+diabetes_pedigree = st.number_input("Diabet tarixi ko'rsatkichi")
+age = st.number_input("Yoshingiz")
 
-if files:
-    st.image(files, caption="Yuklangan rasm", use_column_width=True)
-    
-    # Yuklangan rasimni o'qish
-    img = PILImage.create(files)
-    
-    # Modellni yuklash
-    model = load_learner('classificator.pkl')
-    
-    # Bashorat qilish
-    pred, pred_idx, probs = model.predict(img)
-    
-    # Bashoratlarni o'zbekchaga tarjima qilish uchun lug'at
-    translations = {
-        "Weapon": "Qurol",
-        "Bird": "Qush",
-        "Car": "Mashina",
-        "Airplane": "Samolyot",
-        "Boat": "Qayiq",
-        "Telephone": "Telefon",
-        "Toy": "O'yinchoq",
-        "Helmet": "Dubulg'a",
-        "Ball": "To'p"
-    }
-    
-    # O'zbekcha bashorat
-    uzbek_pred = translations.get(str(pred), "Noma'lum")
-    
-    # Natijalarni ko'rsatish
-    st.write(f"Bashorat: {uzbek_pred}")
-    st.write(f"Ishonch darajasi: {probs[pred_idx]:.4f}")
+# Kiruvchi ma'lumotlarni birlashtirish
+user_data = pd.DataFrame({
+    'Homiladorliklar': [pregnancies],
+    'Glyukoza': [glucose],
+    'Qon bosimi': [blood_pressure],
+    'Teri qalinligi': [skin_thickness],
+    'Insulin': [insulin],
+    'BMI': [bmi],
+    'Diabet tarixi': [diabetes_pedigree],
+    'Yosh': [age]
+})
+
+# Model yordamida bashorat qilish
+if st.button("Diabetni aniqlash"):
+    try:
+        prediction = model.predict(user_data)[0]
+        prediction_prob = model.predict_proba(user_data)[0]
+
+        # Natijalarni ko'rsatish
+        if prediction == 1:
+            st.error("Sizda diabet aniqlanish ehtimoli yuqori!")
+        else:
+            st.success("Sizda diabet aniqlanmadi.")
+
+        st.write("Ehtimollik darajasi:")
+        st.metric(label="Diabet ehtimolligi", value=f"{prediction_prob[1] * 100:.2f}%")
+        st.metric(label="Sog'lom ehtimolligi", value=f"{prediction_prob[0] * 100:.2f}%")
+
+        # Foydalanuvchi ma'lumotlarini chiqarish
+        st.subheader("Foydalanuvchi kiritgan ma'lumotlar")
+        st.write(user_data)
+    except Exception as e:
+        st.error(f"Bashorat qilishda xatolik yuz berdi: {e}")
